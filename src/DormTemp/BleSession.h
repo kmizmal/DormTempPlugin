@@ -18,6 +18,8 @@ void request_reconnect();
 unsigned long long scan(int timeoutMs);
 
 // 连接并保持订阅；maxMs > 0 时到点主动收工（探测工具用，插件传 0 = 一直守着）
-void run_connection(unsigned long long addr, int maxMs = 0);
+// 返回是否真正建立过链路（订阅成功）。地址解析失败、服务不可达、CCCD 写失败都算失败，
+// 调用方据此决定「继续重试记忆地址」还是「退回扫描」。
+bool run_connection(unsigned long long addr, int maxMs = 0);
 
 } // namespace ble

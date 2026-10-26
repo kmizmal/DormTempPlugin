@@ -52,6 +52,9 @@ constexpr int kKeepAliveMs     = 30000;
 constexpr int kIdleDetachMs    = 60000;
 constexpr int kReconnectGapMs  = 2000;
 constexpr int kScanMissGapMs   = 2500;
+// 记忆地址连续失败这么多次就退回扫描：FromBluetoothAddressAsync 依赖广播缓存，
+// 设备休眠停播时它只会返回 null，一直按老地址重试永远连不上
+constexpr int kScanAfterFails  = 3;
 
 winrt::guid service_uuid() { return winrt::guid(protocol::kServiceUuid); }
 winrt::guid characteristic_uuid() { return winrt::guid(protocol::kCharacteristicUuid); }
@@ -181,19 +184,20 @@ unsigned long long scan(int timeoutMs)
     return found;
 }
 
-void run_connection(unsigned long long addr, int maxMs)
+bool run_connection(unsigned long long addr, int maxMs)
 {
     WDB::BluetoothLEDevice device = nullptr;
     WDBG::GattCharacteristic characteristic = nullptr;
     winrt::event_token token{};
     const unsigned long long started = GetTickCount64();
+    bool linked = false;   // 订阅是否成功过；调度线程靠它区分「设备不在」和「连上后又断了」
 
     try {
         state::set_status(kConnecting);
         device = WDB::BluetoothLEDevice::FromBluetoothAddressAsync(addr).get();
         if (!device) {
             logx::write(L"connect: dev null");
-            return;
+            return false;
         }
 
         auto services = device.GetGattServicesForUuidAsync(service_uuid(),
@@ -201,7 +205,7 @@ void run_connection(unsigned long long addr, int maxMs)
         if (services.Status() != WDBG::GattCommunicationStatus::Success ||
             services.Services().Size() == 0) {
             logx::writef(L"connect: svc status=%d", static_cast<int>(services.Status()));
-            return;
+            return false;
         }
 
         auto chars = services.Services().GetAt(0)
@@ -210,7 +214,7 @@ void run_connection(unsigned long long addr, int maxMs)
         if (chars.Status() != WDBG::GattCommunicationStatus::Success ||
             chars.Characteristics().Size() == 0) {
             logx::writef(L"connect: char status=%d", static_cast<int>(chars.Status()));
-            return;
+            return false;
         }
 
         characteristic = chars.Characteristics().GetAt(0);
@@ -230,9 +234,10 @@ void run_connection(unsigned long long addr, int maxMs)
         }
         if (status != WDBG::GattCommunicationStatus::Success) {
             logx::writef(L"connect: cccd fail %d", static_cast<int>(status));
-            return;
+            return false;
         }
 
+        linked = true;
         state::set_mac(addr, true);
         config::save_remembered_mac(addr);
         state::set_status(kOnline);
@@ -296,6 +301,7 @@ void run_connection(unsigned long long addr, int maxMs)
     }
     characteristic = nullptr;
     device = nullptr;
+    return linked;
 }
 
 void start()
@@ -321,6 +327,7 @@ void start()
 
         unsigned long long target = 0;
         bool haveTarget = false;
+        int fails = 0;   // 记忆地址连续失败次数，够了就退回扫描
 
         while (!g_stop) {
             // 皮肤没加载（无 measure 且长时间没人读）：待机，别一直扫蓝牙
@@ -349,7 +356,7 @@ void start()
             if (hasFixed) {
                 target = fixedMac;
                 haveTarget = true;
-            } else if (!haveTarget) {
+            } else if (!haveTarget && fails < kScanAfterFails) {
                 const unsigned long long remembered = config::load_remembered_mac();
                 if (remembered) {
                     target = remembered;
@@ -370,9 +377,17 @@ void start()
                 }
             }
 
-            run_connection(target);
+            const bool ok = run_connection(target);
 
             if (g_stop) break;
+            // 直连记忆地址失败（设备休眠停播时 FromBluetoothAddressAsync 只会返回 null）：
+            // 连续失败够次数就不再试老地址，下一轮由 !haveTarget 分支去做一次扫描。
+            // 扫描既能把设备找回来，也能刷新 Windows 的广播缓存，直连才重新有用。
+            if (ok) {
+                fails = 0;
+            } else if (++fails == kScanAfterFails) {
+                logx::writef(L"remembered mac failed %d times, fall back to scan", fails);
+            }
             if (!hasFixed) haveTarget = false;
             state::set_status(haveTarget ? kConnecting : kSearching);
             std::this_thread::sleep_for(std::chrono::milliseconds(kReconnectGapMs));
