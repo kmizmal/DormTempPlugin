@@ -1,0 +1,14 @@
+# 默认按文本处理，仓库内统一 LF
+* text=auto eol=lf
+
+# Rainmeter 皮肤源保持 CRLF（打包时会再转成 UTF-16 LE + BOM + CRLF）
+*.ini text eol=crlf
+*.inc text eol=crlf
+
+# 二进制
+*.png binary
+*.bmp binary
+*.rmskin binary
+*.dll binary
+*.exe binary
+*.db binary
