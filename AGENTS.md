@@ -1,6 +1,6 @@
 ---
 name: dormtemp-ble-rainmeter-plugin
-description: 维护 DormTemp 宿舍温湿度 Rainmeter 插件（C++/WinRT 直读 BLE + SQLite 落盘）的工程约定。应在修改该项目的插件逻辑、皮肤、构建/打包脚本，或排查「插件加载失败 / 改了没生效 / 扫不到设备 / 数据不入库」时使用。
+description: 维护 DormTemp（米家温湿度计 3 mini 的 Rainmeter 插件，C++/WinRT 直读 BLE + SQLite 落盘）的工程约定。应在修改该项目的插件逻辑、皮肤、构建/打包脚本，或排查「插件加载失败 / 改了没生效 / 扫不到设备 / 数据不入库」时使用。
 agent_created: true
 ---
 

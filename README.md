@@ -1,6 +1,6 @@
-# DormTemp Monitor · 宿舍温湿度雨滴皮肤（原生插件版）
+# DormTemp Monitor · 米家温湿度计 3 mini 的 Rainmeter 皮肤（原生插件版）
 
-显示小米温湿度计 3 mini（`MJWSD06MMC`）的温度、湿度、电池电压与舒适度，
+显示米家温湿度计 3 mini（`MJWSD06MMC`）的温度、湿度、电池电压与舒适度，
 数据由随包安装的 **原生 DLL 插件** 直接读 BLE GATT，不需要 Python、.NET 或任何后台进程。
 
 ![主面板 + 汇总卡片 + 曲线卡](docs/preview.png)
@@ -202,6 +202,15 @@ python build_package.py --install  # 同时投影到本机（皮肤 + 两个插�
 `init type=…` 成功；曲线 PNG 按 40 秒节流重画（`today_1.png` → `today_2.png`），
 `Image` meter 换路径后随即刷新。
 
-## 六、许可
+## 九、致谢
 
-**GPL-3.0**，全文见 [LICENSE](LICENSE)。
+协议结论和产品形态都来自上游 [**dorm-temp-monitor**](https://github.com/cxzxx783/dorm-temp-monitor)（MIT）：
+设备名 `MJWSD06MMC` 的识别方式、特征 `ebe0ccc1-…`、5 字节小端负载的换算、电压三档电量，
+以及「电脑自带蓝牙直读、不要网关、数据不出本机」这个思路，都是那边先摸出来的。
+
+上游是 Python + pywebview + ECharts 的桌面程序，每天一个 CSV；这里把采集换成了 Rainmeter 的
+原生 DLL（C++/WinRT），存储换成 SQLite，界面换成皮肤 + 可选卡片。想跑那个版本请直接去上游。
+
+## 十、许可
+
+**GPL-3.0**，全文见 [LICENSE](LICENSE)。上游是 MIT，与本项目的 GPL-3.0 兼容。
