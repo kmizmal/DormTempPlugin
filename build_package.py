@@ -8,7 +8,7 @@
   2. 生成 RMSKIN.ini 元数据；
   3. 把 DLL 放进包内 Plugins/64bit/ —— 安装器会按宿主位数自动装到插件目录；
   4. 压缩并追加 16 字节 PackageFooter（少了它安装器直接拒绝这个包）；
-  5. 自检：footer 魔数、Load 指向的皮肤在包里、插件确实是 x64；
+  5. 自检：footer 魔数、Load 指向的皮肤在包里、插件确实是 x64、许可全文在包里；
   6. 可选 --install：直接投影到本机（皮肤 + 两个插件目录）。
 
 用法：
@@ -51,7 +51,7 @@ USER_PLUGINS = Path.home() / "AppData" / "Roaming" / "Rainmeter" / "Plugins"
 
 RMSKIN_INI = """[rmskin]
 Name=DormTemp Monitor
-Author=WorkBuddy
+Author=kmizmal
 Version={version}
 LoadType=Skin
 Load={config}\\{config}.ini
@@ -59,12 +59,19 @@ MinimumRainmeter=4.5
 MinimumWindows=10
 """.format(config=CONFIG, version=VERSION)
 
+# 随包装走的文档：GPL 要求分发二进制时附带许可全文，
+# 免责声明（商标归小米、不改设备）也应该跟着安装包走，而不是只留在仓库里。
+DOCS = [("LICENSE", "LICENSE.txt"), ("README.md", "README.md")]
+
 
 def stage() -> Path:
     target = DIST / CONFIG
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(SRC, target, ignore=shutil.ignore_patterns("*.tmp", "__pycache__"))
+
+    for src, name in DOCS:
+        shutil.copy2(ROOT / src, target / name)
 
     for path in target.rglob("*"):
         if path.is_file() and path.suffix.lower() in UTF16_SUFFIXES:
@@ -131,6 +138,9 @@ def verify_package(package: Path) -> None:
         plugins = [n for n in names if n.startswith("Plugins/64bit/") and n.endswith(".dll")]
         if not plugins:
             raise SystemExit("缺少 Plugins/64bit/*.dll")
+
+        if f"Skins/{CONFIG}/LICENSE.txt" not in names:
+            raise SystemExit("包里缺少 LICENSE.txt（GPL 要求随二进制分发许可全文）")
 
         dll = z.read(plugins[0])
         pe = struct.unpack_from("<I", dll, 0x3C)[0]
