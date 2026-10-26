@@ -4,7 +4,7 @@
 数据由随包安装的 **原生 DLL 插件** 直接读 BLE GATT，不需要 Python、.NET 或任何后台进程。
 
 > 非官方项目：与小米公司没有任何关系，不修改、不写入设备，数据只留在本机。
-> 详见[免责声明](#八免责声明)。
+> 详见[免责声明](#七免责声明)。
 
 ![主面板 + 汇总卡片 + 曲线卡](docs/preview.png)
 
@@ -159,17 +159,7 @@ python build_package.py --install  # 同时投影到本机（皮肤 + 两个插�
 4. `LICENSE.txt` 与 `README.md`（含免责声明）一并放进皮肤目录：GPL 分发二进制时要附带许可全文，
    免责声明也该跟着安装包走，不能只留在仓库里。打包自检会核对这一项。
 
-## 六、踩过的坑（部署侧）
-
-| 现象 | 根因 |
-| --- | --- |
-| 改了代码但界面没变 | Rainmeter 有**两个**插件目录，`%LOCALAPPDATA%\Programs\Rainmeter\Plugins` 优先于 `%APPDATA%\Rainmeter\Plugins`；只改后者等于没改 |
-| 插件加载报 126 | DLL 文件名必须与皮肤里的 `Plugin=` 完全一致（`Plugin=DormTemp` → `DormTemp.dll`） |
-| `GetString` 全是空串 | 用老式 `(file, section, id)` 签名调 `RmReadString`，拿到的 id 是垃圾值；必须走 v3 的 `(rm, option, default, replaceMeasures)` |
-| 日志条目粘成一行 | 以 `ccs=UTF-8` 文本模式写文件时再手动写 `\r\n`，会被翻译成 `\r\r\n`；写 `\n` 即可 |
-| 插件在进程退出时崩 | `DllMain` 里要 `ble::stop()` 等采集线程收尾，否则回调进已卸载的代码段 |
-
-## 七、已知限制
+## 六、已知限制
 
 1. 传感器休眠时不广播，**必须先按一下侧键唤醒**，否则扫描只能看到别的 BLE 设备。
 2. 只出 x64 产物（当前 Rainmeter 为 64 位）；32 位宿主会静默加载失败。
@@ -179,7 +169,7 @@ python build_package.py --install  # 同时投影到本机（皮肤 + 两个插�
 6. 首次连接会在数据目录写 `device_mac.txt` 记住设备；固定 `MacAddress` 后不再写。
 7. 连接期间每 30 秒读一次做保活，比纯手抄略费电；皮肤静默 60 秒后进待机就不再扫蓝牙。
 
-## 八、免责声明
+## 七、免责声明
 
 **名称与商标归小米。** 「小米」「Xiaomi」「米家」「MIJIA」、`米家温湿度计 3 mini`、`MJWSD06MMC`
 等产品名称、商标与相关素材，所有权归小米科技有限责任公司及其关联公司。本仓库在标题、文档
@@ -207,7 +197,7 @@ App 里提取的内容。
 **关于名称使用。** 若权利人认为本仓库中某个名称、截图或素材使用不当，请在 Issues 里说明，
 我会尽快改名或删除。
 
-## 九、致谢
+## 八、致谢
 
 协议结论和产品形态都来自上游 [**dorm-temp-monitor**](https://github.com/cxzxx783/dorm-temp-monitor)（MIT）：
 设备名 `MJWSD06MMC` 的识别方式、特征 `ebe0ccc1-…`、5 字节小端负载的换算、电压三档电量，
@@ -216,6 +206,6 @@ App 里提取的内容。
 上游是 Python + pywebview + ECharts 的桌面程序，每天一个 CSV；这里把采集换成了 Rainmeter 的
 原生 DLL（C++/WinRT），存储换成 SQLite，界面换成皮肤 + 可选卡片。想跑那个版本请直接去上游。
 
-## 十、许可
+## 九、许可
 
 **GPL-3.0**，全文见 [LICENSE](LICENSE)。上游是 MIT，与本项目的 GPL-3.0 兼容。
