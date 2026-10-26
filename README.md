@@ -201,3 +201,7 @@ python build_package.py --install  # 同时投影到本机（皮肤 + 两个插�
 真机侧：Rainmeter 启动后主面板与三张可选皮肤同时加载，27 个 measure 全部
 `init type=…` 成功；曲线 PNG 按 40 秒节流重画（`today_1.png` → `today_2.png`），
 `Image` meter 换路径后随即刷新。
+
+## 六、许可
+
+**GPL-3.0**，全文见 [LICENSE](LICENSE)。
