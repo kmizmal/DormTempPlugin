@@ -158,6 +158,8 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          # 这个 job 不 checkout，没有 git 远端可推断，得显式告诉 gh 操作哪个仓库
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           # gh release view 查不到 Release 会返回非 0，这里不能当成致命错误
