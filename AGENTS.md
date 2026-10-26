@@ -59,9 +59,15 @@ dist/DormProbe.exe chart "" 24                     # 单独渲染曲线，验证
 | `Plugin.cpp` 只做导出与选项读取 | 在 `Update` 里做任何阻塞操作（蓝牙往返、SQLite 大查询） |
 | 汇总数字由采集线程调 `Stats::refresh` 算，`Update` 只读缓存 | 在 `GetString`/`Update` 里临时查库（会被每帧调用几十次） |
 | 曲线在 `Chart.cpp` 自己的线程里画（GDI+ 动态加载），`Update` 只返回路径 | 在 `Update`/`GetString` 里画图或调 `GdiplusStartup` |
-| 曲线 PNG 文件名带 rev（`today_3.png`），路径一变 Rainmeter 才会重新载图 | 原地覆盖同名 PNG（Rainmeter 会继续显示缓存的那张） |
+| 曲线 PNG 每次写成新 rev 文件名，Image meter 上加 `DynamicVariables=1` | 只靠同名覆盖（重写那一下可能被宿主读到半个文件） |
 | 双序列曲线（`Series=Both`）温度走左轴、湿度走右轴，刻度分别用 `ChartHi/Mid/Lo` 与 `ChartHi2/Mid2/Lo2` | 让湿度蹭温度那根轴（两套量纲，读数会完全对不上） |
 | `Store` 只认目录，不读全局配置 | 在 `Store` 里调 `Config`（循环依赖） |
+
+Image meter 的缓存规则（2026-10-26 用一个三块并排的测试皮肤实测，推翻过这里原先的说法）：
+`ImageName` 写字面量路径时按路径缓存，改写磁盘文件**不**刷新；加了 `DynamicVariables=1`
+就每次 Update 重新从磁盘读，`[&Measure]` 这种写法同理。所以「同名 PNG 不刷新」只在没开
+`DynamicVariables` 时成立。rev 命名仍然保留，理由是躲开「宿主正在读、插件正在写」的撞车，
+不是刷新的必要条件。
 
 ## 故障排查顺序
 
