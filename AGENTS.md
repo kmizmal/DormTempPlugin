@@ -24,6 +24,7 @@ winrt_gen/          cppwinrt 生成的投影头（生成物）
 build_plugin.py     构建 + PE 校验 + 可选测试/安装
 build_package.py    打 .rmskin + 自检 + 可选安装
 dist/               产物：plugin/DormTemp.dll、DormProbe.exe、*.rmskin
+.github/workflows/build.yml  CI：编译 + 测试 + 打包（v* tag 自动发 Release）
 ```
 
 ## 常用命令
@@ -73,6 +74,21 @@ dist/DormProbe.exe chart "" 24                     # 单独渲染曲线，验证
    （窗口尺寸 = 皮肤尺寸 + 1，主面板 224×112 → 225×113）。
 7. **皮肤没出来** → `!ActivateConfig <config> <file>` 一次只能让一个 config 活一个皮肤；
    同一文件夹里的多个 .ini 会被互相顶掉。可选皮肤必须各自一个子文件夹。
+
+## CI（GitHub Actions）
+
+`.github/workflows/build.yml`，跑的就是本机那两条命令（不带 `--install`）：
+
+```
+python build_plugin.py --test --probe   # 编译 + PE 校验 + 189 项测试
+python build_package.py                 # 打 .rmskin + 包内自检
+```
+
+- 运行在 `windows-latest`；zig 固定 0.13.0，下载后缓存到 `C:\zig`（`ZIG` 环境变量指向它）。
+- 投影头不入库，CI 用 SDK 自带 `cppwinrt.exe` 现生成，按 SDK 版本缓存
+  （`winrt-gen-<sdk>-v1`）。改了生成参数就升 `-v1`，否则永远命中旧缓存。
+- push / PR 上传 artifact；推 `v*` tag 时第二个 job 建 Release 附 `.rmskin`，已存在就 `--clobber` 覆盖附件。
+- 包名与 artifact 名都取皮肤里的 `Version=`，发版前先改那一个数字。
 
 ## 环境事实
 

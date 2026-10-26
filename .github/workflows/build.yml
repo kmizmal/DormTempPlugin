@@ -1,0 +1,173 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的新提交直接顶掉上一次构建，tag 构建不互相取消
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZIG_VERSION: 0.13.0
+  ZIG: C:\zig\zig.exe
+
+jobs:
+  build:
+    name: 编译 / 测试 / 打包
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: 检出
+        uses: actions/checkout@v4
+
+      # 版本号只在皮肤里写一份，包名和产物名都跟着它走
+      - name: 读取皮肤版本号
+        id: meta
+        shell: pwsh
+        run: |
+          $line = (Select-String -Path 'skins/DormTempMonitor/DormTempMonitor.ini' -Pattern '^Version=').Line
+          $version = ($line -replace '^Version=', '').Trim()
+          if (-not $version) { throw '皮肤 [Metadata] 里找不到 Version=' }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "皮肤版本 $version"
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 79 MB 的 zig 每次重下太慢，按版本号缓存
+      - name: 缓存 zig
+        id: zig-cache
+        uses: actions/cache@v4
+        with:
+          path: C:\zig
+          key: zig-${{ env.ZIG_VERSION }}-windows-x86_64
+
+      - name: 安装 zig ${{ env.ZIG_VERSION }}
+        if: steps.zig-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $url = "https://ziglang.org/download/$env:ZIG_VERSION/zig-windows-x86_64-$env:ZIG_VERSION.zip"
+          $zip = Join-Path $env:RUNNER_TEMP 'zig.zip'
+          for ($i = 1; $i -le 3; $i++) {
+            try { Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing; break }
+            catch {
+              if ($i -eq 3) { throw }
+              Write-Host "下载失败（第 $i 次），重试…"
+              Start-Sleep -Seconds (5 * $i)
+            }
+          }
+          Expand-Archive -Path $zip -DestinationPath (Join-Path $env:RUNNER_TEMP 'zig-unpack') -Force
+          Move-Item (Join-Path $env:RUNNER_TEMP "zig-unpack\zig-windows-x86_64-$env:ZIG_VERSION") 'C:\zig'
+          & 'C:\zig\zig.exe' version
+
+      # winrt_gen/ 是 64 MB 生成物、不入库；用 SDK 自带的 cppwinrt 现生成，
+      # 生成结果按 SDK 版本缓存，SDK 升级时 key 自然失效
+      - name: 定位 cppwinrt
+        id: sdk
+        shell: pwsh
+        run: |
+          $root = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+          if (-not (Test-Path $root)) { throw "找不到 Windows SDK：$root" }
+          $found = Get-ChildItem $root -Directory |
+            ForEach-Object { Join-Path $_.FullName 'x64\cppwinrt.exe' } |
+            Where-Object { Test-Path $_ } |
+            Sort-Object { [version](Split-Path (Split-Path $_ -Parent) -Parent | Split-Path -Leaf) } |
+            Select-Object -Last 1
+          if (-not $found) { throw 'Windows SDK 里没有 x64\cppwinrt.exe' }
+          "exe=$found" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "version=$((Split-Path (Split-Path $found -Parent) -Parent | Split-Path -Leaf))" |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "cppwinrt：$found"
+
+      - name: 缓存 WinRT 投影头
+        id: winrt-cache
+        uses: actions/cache@v4
+        with:
+          path: winrt_gen
+          key: winrt-gen-${{ steps.sdk.outputs.version }}-v1
+
+      - name: 生成 WinRT 投影头
+        if: steps.winrt-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          & '${{ steps.sdk.outputs.exe }}' -in "$env:WINDIR\System32\WinMetadata\*.winmd" -out winrt_gen
+          if (-not (Test-Path 'winrt_gen\winrt\base.h')) { throw 'cppwinrt 没生成 winrt/base.h' }
+
+      - name: 编译插件 + 跑测试
+        run: python build_plugin.py --test --probe
+
+      - name: 打包 .rmskin
+        run: python build_package.py
+
+      - name: 产物摘要
+        shell: pwsh
+        run: |
+          $rmskin = Get-ChildItem 'dist\*.rmskin' | Select-Object -First 1
+          $dll = Get-Item 'dist\plugin\DormTemp.dll'
+          $lines = @(
+            '### 构建产物',
+            '',
+            '| 文件 | 大小 | SHA-256 |',
+            '| --- | --- | --- |',
+            "| $($rmskin.Name) | $([math]::Round($rmskin.Length / 1KB)) KB | ``$((Get-FileHash $rmskin -Algorithm SHA256).Hash.ToLower())`` |",
+            "| DormTemp.dll | $([math]::Round($dll.Length / 1KB)) KB | ``$((Get-FileHash $dll -Algorithm SHA256).Hash.ToLower())`` |",
+            '',
+            "zig $env:ZIG_VERSION · cppwinrt ${{ steps.sdk.outputs.version }} · 皮肤 ${{ steps.meta.outputs.version }}"
+          )
+          $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: DormTempMonitor-${{ steps.meta.outputs.version }}
+          path: |
+            dist/*.rmskin
+            dist/plugin/DormTemp.dll
+            dist/DormProbe.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  # 推 v* tag 才发 Release；tag 已由推送方创建，这里只补附件和说明
+  release:
+    name: 发布 Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: 取回产物
+        uses: actions/download-artifact@v4
+        with:
+          name: DormTempMonitor-${{ needs.build.outputs.version }}
+          path: dist
+
+      - name: 创建或补附件
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # gh release view 查不到 Release 会返回非 0，这里不能当成致命错误
+          $ErrorActionPreference = 'Continue'
+          $pkg = (Get-ChildItem 'dist\*.rmskin' | Select-Object -First 1).FullName
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $env:TAG 已存在，覆盖附件"
+            gh release upload $env:TAG $pkg --clobber
+          } else {
+            Write-Host "新建 Release $env:TAG"
+            gh release create $env:TAG $pkg --verify-tag --title "DormTemp Monitor $env:TAG" --generate-notes
+          }

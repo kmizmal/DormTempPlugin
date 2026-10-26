@@ -1,5 +1,7 @@
 # DormTemp Monitor · 米家温湿度计 3 mini 的 Rainmeter 皮肤（原生插件版）
 
+[![build](https://github.com/kmizmal/DormTempPlugin/actions/workflows/build.yml/badge.svg)](https://github.com/kmizmal/DormTempPlugin/actions/workflows/build.yml)
+
 显示米家温湿度计 3 mini（`MJWSD06MMC`）的温度、湿度、电池电压与舒适度，
 数据由随包安装的 **原生 DLL 插件** 直接读 BLE GATT，不需要 Python、.NET 或任何后台进程。
 
@@ -127,6 +129,11 @@ python build_plugin.py --install       # 构建并写入两个插件目录
 > 不入库。跑一次 `cppwinrt.exe -in %WINDIR%\System32\WinMetadata -out winrt_gen`
 > 就行，之后每次构建直接沿用。构建依赖 zig（`../tools/zig/zig.exe`）与 Windows 10+ 自带的
 > `winsqlite3.dll`。
+
+不想在本机装工具链：`.github/workflows/build.yml` 在 push / PR 上跑同一套命令——
+取 SDK 自带的 `cppwinrt` 生投影头（按 SDK 版本缓存）→ zig 编译 → 189 项测试 →
+打包，`.rmskin`、`DormTemp.dll`、`DormProbe.exe` 作为 artifact 挂在构建页；
+推 `v*` tag 则自动建 Release 并附上 `.rmskin`（已存在就覆盖附件）。
 
 探测工具（对应 MCHOSE 项目的 HidProbe）：
 
