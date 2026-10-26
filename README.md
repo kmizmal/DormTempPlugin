@@ -59,20 +59,6 @@ measure 的 `Type` 一览（`Window` 只对汇总 / 曲线类生效，取值 `To
 其余选项写在 `Type=Chart` 的那个 measure 上：`Hours` / `Buckets` / `Width` / `Height` /
 `Series=Temp|Hum` / `Color=r,g,b`。
 
-## 交付内容
-
-| 路径 | 说明 |
-| --- | --- |
-| `dist/DormTempMonitor_4.3.rmskin` | 双击安装的包（主面板 + 6 张可选皮肤 + 插件 DLL，约 353 KB；文件名取皮肤 `Version=`） |
-| `dist/plugin/DormTemp.dll` | 插件产物（x64，889 KB，静态链接） |
-| `dist/DormProbe.exe` | 蓝牙探测工具（扫描 / 连接监听 / 查库 / 单独出曲线图） |
-| `src/DormTemp/` | 插件源码（C++20 / C++/WinRT） |
-| `skins/DormTempMonitor/` | 皮肤源码（UTF-8 编辑源，打包时转 UTF-16） |
-| `tests/ProtocolTests.cpp` | 协议 / 状态 / 存储 / 汇总 / 分桶 / 坐标轴的可执行测试集（189 项） |
-| `build_plugin.py` | 构建插件：zig 编译 → PE 校验 → 可选跑测试 / 装本机 |
-| `build_package.py` | 打包：编码转换 → RMSKIN.ini → 压缩 → footer → 自检 / 安装 |
-| `winrt_gen/` | cppwinrt 生成的 WinRT 投影头（**生成物，不要手改**） |
-
 ## 一、架构
 
 ```
@@ -153,6 +139,8 @@ dist/DormProbe.exe chart "" 168 hum       # 近 7 天湿度曲线
 
 ## 五、打包与部署
 
+不想自己编：**Releases** 里有打好的 `DormTempMonitor_<版本>.rmskin`，双击就能装。
+
 ```bash
 python build_package.py            # 产出 dist/DormTempMonitor_<皮肤 Version>.rmskin
 python build_package.py --install  # 同时投影到本机（皮肤 + 两个插件目录）
@@ -185,24 +173,7 @@ python build_package.py --install  # 同时投影到本机（皮肤 + 两个插�
 5. 同一秒内的多条通知只入库一条（去重），这是刻意行为。
 6. 首次连接会在数据目录写 `device_mac.txt` 记住设备；固定 `MacAddress` 后不再写。
 
-## 八、测试里程碑
-
-| 范围 | 数量 | 状态 |
-| --- | --- | --- |
-| 协议解析 / 广播名匹配 | 28 | 全绿 |
-| 数值格式化 / 状态 / 电量 / 舒适度 | 33 | 全绿 |
-| MAC 解析与格式化 | 18 | 全绿 |
-| 配置写入规则 / 快照读写 | 19 | 全绿 |
-| SQLite 落盘 / 去重 / 查询 / 聚合 | 29 | 全绿 |
-| 区间汇总缓存 / 窗口计算 / 摘要文案 | 32 | 全绿 |
-| 分桶序列 / 曲线坐标轴取整 | 29 | 全绿 |
-| **合计** | **189** | 全绿 |
-
-真机侧：Rainmeter 启动后主面板与三张可选皮肤同时加载，27 个 measure 全部
-`init type=…` 成功；曲线 PNG 按 40 秒节流重画（`today_1.png` → `today_2.png`），
-`Image` meter 换路径后随即刷新。
-
-## 九、致谢
+## 八、致谢
 
 协议结论和产品形态都来自上游 [**dorm-temp-monitor**](https://github.com/cxzxx783/dorm-temp-monitor)（MIT）：
 设备名 `MJWSD06MMC` 的识别方式、特征 `ebe0ccc1-…`、5 字节小端负载的换算、电压三档电量，
@@ -211,6 +182,6 @@ python build_package.py --install  # 同时投影到本机（皮肤 + 两个插�
 上游是 Python + pywebview + ECharts 的桌面程序，每天一个 CSV；这里把采集换成了 Rainmeter 的
 原生 DLL（C++/WinRT），存储换成 SQLite，界面换成皮肤 + 可选卡片。想跑那个版本请直接去上游。
 
-## 十、许可
+## 九、许可
 
 **GPL-3.0**，全文见 [LICENSE](LICENSE)。上游是 MIT，与本项目的 GPL-3.0 兼容。
