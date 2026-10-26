@@ -132,8 +132,8 @@ python build_plugin.py --install       # 构建并写入两个插件目录
 
 不想在本机装工具链：`.github/workflows/build.yml` 在 push / PR 上跑同一套命令——
 取 SDK 自带的 `cppwinrt` 生投影头（按 SDK 版本缓存）→ zig 编译 → 189 项测试 →
-打包，`.rmskin`、`DormTemp.dll`、`DormProbe.exe` 作为 artifact 挂在构建页；
-推 `v*` tag 则自动建 Release 并附上 `.rmskin`（已存在就覆盖附件）。
+打包，`.rmskin`、`DormTemp.dll`、`DormProbe.exe` 作为 artifact 挂在构建页（保留 30 天）。
+工作流不碰 **Releases**：发版是人工行为，自动产物只留在 Actions 里。
 
 探测工具（对应 MCHOSE 项目的 HidProbe）：
 
