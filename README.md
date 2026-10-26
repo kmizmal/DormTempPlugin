@@ -38,11 +38,12 @@ DormTempMonitor/
 - 可选汇总卡片（`Cards\Today|Day|Week`）：每张给「均温 + 最高 + 最低 + 湿度均 + 样本数」，
   数字全部来自 SQLite 聚合，不是把历史采样塞进内存；悬停卡片可看极值出现的时刻。
 - 可选曲线卡（`Cards\ChartToday|ChartDay|ChartWeek`）：插件把区间采样分桶后画成 PNG，
-  皮肤只负责贴图。曲线是透明底 + 网格 + 面积填充 + 折线 + 末端点，Y 轴三档刻度、
-  左侧「起始时间」右侧「现在」，底部一行给区间内的最低 / 最高。
+  皮肤只负责贴图。**温度和湿度画在同一张图上**：温度走左轴（蓝），湿度走右轴（绿），
+  透明底 + 网格 + 折线 + 末端点；两轴各三档刻度、左侧「起始时间」右侧「现在」，
+  底部两行分别给温度和湿度在区间内的最低 / 最高。
 - 想在卡片里改区间：`Cards\<名字>\<名字>.ini` 的 `[Variables]` 里改 `CardWindow`（只有
   Today / 24h / 7d）；曲线卡还能把 `ChartWindow` 留空、写 `ChartHours=48` 要任意小时数，
-  `ChartSeries=Hum` 就切换成湿度曲线。
+  `ChartSeries=Both`（默认）双轴同图，写 `Temp` 或 `Hum` 就只画一条。
 
 measure 的 `Type` 一览（`Window` 只对汇总 / 曲线类生效，取值 `Today` / `24h` / `7d`）：
 
@@ -56,13 +57,14 @@ measure 的 `Type` 一览（`Window` 只对汇总 / 曲线类生效，取值 `To
 | 汇总 | `TempMaxAt` `TempMinAt` | 最高 / 最低出现的时刻（跨天带日期） |
 | 汇总 | `Samples` `Summary` | 样本条数、一行文字摘要（给 tooltip 用） |
 | 曲线 | `Chart` | 渲染结果：PNG 绝对路径（直接喂 `Image` meter） |
-| 曲线 | `ChartHi` `ChartMid` `ChartLo` | Y 轴三档刻度值 |
-| 曲线 | `ChartMin` `ChartMax` `ChartMinAt` `ChartMaxAt` | 区间内极值与出现时刻 |
-| 曲线 | `ChartSpan` `ChartSeries` | 「24 小时前」这类时间轴文案、当前序列名 |
+| 曲线 | `ChartHi` `ChartMid` `ChartLo` | 左轴（温度）三档刻度值 |
+| 曲线 | `ChartHi2` `ChartMid2` `ChartLo2` | 右轴（湿度）三档刻度值，`Series=Both` 时才有值 |
+| 曲线 | `ChartMin` `ChartMax` `ChartMinAt` `ChartMaxAt` | 区间内极值与出现时刻（`Series=Hum` 取湿度的） |
+| 曲线 | `ChartSpan` `ChartSeries` | 「24 小时前」这类时间轴文案、当前序列名（双轴时为「温度 / 湿度」） |
 
 曲线类共用 `Chart=<key>` 指定同一份渲染结果（同一个 key 只画一次），
 其余选项写在 `Type=Chart` 的那个 measure 上：`Hours` / `Buckets` / `Width` / `Height` /
-`Series=Temp|Hum` / `Color=r,g,b`。
+`Series=Both|Temp|Hum` / `Color=r,g,b` / `Color2=r,g,b`。
 
 ## 一、架构
 
@@ -142,7 +144,8 @@ dist/DormProbe.exe scan 8                 # 列出周边广播：MAC / RSSI / �
 dist/DormProbe.exe read AA:BB:CC:DD:EE:FF 20   # 连接并打印通知
 dist/DormProbe.exe db                     # 看正式库里已有多少条记录（顺带打印三个窗口汇总）
 dist/DormProbe.exe chart "" 24            # 把近 24 小时画成 PNG，验证曲线外观
-dist/DormProbe.exe chart "" 168 hum       # 近 7 天湿度曲线
+dist/DormProbe.exe chart "" 24 both       # 温湿度双轴（和皮肤里的曲线卡一致）
+dist/DormProbe.exe chart "" 168 hum       # 只画湿度，近 7 天
 ```
 
 `read`/`scan` 的临时数据落在 `%TEMP%\DormProbe`，不会污染皮肤在用的数据库。

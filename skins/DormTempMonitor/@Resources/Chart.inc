@@ -5,8 +5,9 @@
 ;    ChartWindow  Today | 24h | 7d，留空则用 ChartHours
 ;    ChartHours   自定义小时数（1 ~ 2160）
 ;    ChartTitle   卡片标题
-;    ChartSeries  Temp | Hum
-;    ChartColor   曲线颜色 r,g,b
+;    ChartSeries  Both | Temp | Hum，Both（默认）温度走左轴、湿度走右轴画在同一张图上
+;    ChartColor   温度线颜色 r,g,b
+;    ChartColor2  湿度线颜色 r,g,b
 ;  曲线由插件在自己的线程里画成 PNG，这里只是把图片贴上来
 ; ============================================================================
 [Variables]
@@ -14,16 +15,23 @@ ChartKey=24h
 ChartWindow=24h
 ChartHours=24
 ChartTitle=近 24 小时
-ChartSeries=Temp
+ChartSeries=Both
 ChartColor=120,196,255
+ChartColor2=127,224,176
 ChartUnit=°C
+ChartUnit2=%
 
-ChartW=224
-ChartH=172
+; 坐标轴数字跟着曲线同色，一眼能对上左右两根轴
+ChartAxisColor=120,196,255,170
+ChartAxisColor2=127,224,176,170
+
+; 卡片尺寸：左侧留给温度刻度，右侧留给湿度刻度
+ChartW=248
+ChartH=174
 ChartPlotX=34
-ChartPlotW=172
+ChartPlotW=160
 ChartPlotY=36
-ChartPlotH=92
+ChartPlotH=86
 
 ; ============ 出图 ============
 [MeasureChartPath]
@@ -38,19 +46,19 @@ Width=#ChartPlotW#
 Height=#ChartPlotH#
 Series=#ChartSeries#
 Color=#ChartColor#
+Color2=#ChartColor2#
 LogPath=#DataPath#
 DeviceName=#DeviceName#
 MacAddress=#MacAddress#
 UpdateDivider=5
 DynamicVariables=1
 
-; ============ 坐标轴与说明 ============
+; ============ 左轴（温度） ============
 [MeasureChartHi]
 Measure=Plugin
 Plugin=DormTemp
 Type=ChartHi
 Chart=#ChartKey#
-Series=#ChartSeries#
 UpdateDivider=10
 DynamicVariables=1
 
@@ -59,7 +67,6 @@ Measure=Plugin
 Plugin=DormTemp
 Type=ChartMid
 Chart=#ChartKey#
-Series=#ChartSeries#
 UpdateDivider=10
 DynamicVariables=1
 
@@ -68,16 +75,41 @@ Measure=Plugin
 Plugin=DormTemp
 Type=ChartLo
 Chart=#ChartKey#
-Series=#ChartSeries#
 UpdateDivider=10
 DynamicVariables=1
 
+; ============ 右轴（湿度） ============
+[MeasureChartHi2]
+Measure=Plugin
+Plugin=DormTemp
+Type=ChartHi2
+Chart=#ChartKey#
+UpdateDivider=10
+DynamicVariables=1
+
+[MeasureChartMid2]
+Measure=Plugin
+Plugin=DormTemp
+Type=ChartMid2
+Chart=#ChartKey#
+UpdateDivider=10
+DynamicVariables=1
+
+[MeasureChartLo2]
+Measure=Plugin
+Plugin=DormTemp
+Type=ChartLo2
+Chart=#ChartKey#
+UpdateDivider=10
+DynamicVariables=1
+
+; ============ 极值 ============
 [MeasureChartMin]
 Measure=Plugin
 Plugin=DormTemp
 Type=ChartMin
 Chart=#ChartKey#
-Series=#ChartSeries#
+Series=Temp
 UpdateDivider=10
 DynamicVariables=1
 
@@ -86,7 +118,25 @@ Measure=Plugin
 Plugin=DormTemp
 Type=ChartMax
 Chart=#ChartKey#
-Series=#ChartSeries#
+Series=Temp
+UpdateDivider=10
+DynamicVariables=1
+
+[MeasureChartHumMin]
+Measure=Plugin
+Plugin=DormTemp
+Type=ChartMin
+Chart=#ChartKey#
+Series=Hum
+UpdateDivider=10
+DynamicVariables=1
+
+[MeasureChartHumMax]
+Measure=Plugin
+Plugin=DormTemp
+Type=ChartMax
+Chart=#ChartKey#
+Series=Hum
 UpdateDivider=10
 DynamicVariables=1
 
@@ -94,14 +144,6 @@ DynamicVariables=1
 Measure=Plugin
 Plugin=DormTemp
 Type=ChartSpan
-Chart=#ChartKey#
-UpdateDivider=10
-DynamicVariables=1
-
-[MeasureChartSeriesName]
-Measure=Plugin
-Plugin=DormTemp
-Type=ChartSeries
 Chart=#ChartKey#
 UpdateDivider=10
 DynamicVariables=1
@@ -118,14 +160,23 @@ X=18
 Y=12
 Text=#ChartTitle#
 
-[ChartSeries]
+[ChartLegendTemp]
 Meter=String
 MeterStyle=StyleSmall
+FontColor=#ChartAxisColor#
 X=(#ChartW#-18)
 Y=13
 StringAlign=Right
-MeasureName=MeasureChartSeriesName
-Text=%1曲线
+Text=温度 #ChartUnit#
+
+[ChartLegendHum]
+Meter=String
+MeterStyle=StyleSmall
+FontColor=#ChartAxisColor2#
+X=(#ChartW#-60)
+Y=13
+StringAlign=Right
+Text=湿度 #ChartUnit2#
 
 [ChartImage]
 Meter=Image
@@ -140,6 +191,7 @@ DynamicVariables=1
 [ChartHi]
 Meter=String
 MeterStyle=StyleSmall
+FontColor=#ChartAxisColor#
 X=(#ChartPlotX#-6)
 Y=(#ChartPlotY#-6)
 StringAlign=Right
@@ -149,6 +201,7 @@ Text=%1
 [ChartMid]
 Meter=String
 MeterStyle=StyleSmall
+FontColor=#ChartAxisColor#
 X=(#ChartPlotX#-6)
 Y=(#ChartPlotY#+(#ChartPlotH#/2)-6)
 StringAlign=Right
@@ -158,10 +211,41 @@ Text=%1
 [ChartLo]
 Meter=String
 MeterStyle=StyleSmall
+FontColor=#ChartAxisColor#
 X=(#ChartPlotX#-6)
 Y=(#ChartPlotY#+#ChartPlotH#-6)
 StringAlign=Right
 MeasureName=MeasureChartLo
+Text=%1
+
+[ChartHi2]
+Meter=String
+MeterStyle=StyleSmall
+FontColor=#ChartAxisColor2#
+X=(#ChartPlotX#+#ChartPlotW#+6)
+Y=(#ChartPlotY#-6)
+StringAlign=Left
+MeasureName=MeasureChartHi2
+Text=%1
+
+[ChartMid2]
+Meter=String
+MeterStyle=StyleSmall
+FontColor=#ChartAxisColor2#
+X=(#ChartPlotX#+#ChartPlotW#+6)
+Y=(#ChartPlotY#+(#ChartPlotH#/2)-6)
+StringAlign=Left
+MeasureName=MeasureChartMid2
+Text=%1
+
+[ChartLo2]
+Meter=String
+MeterStyle=StyleSmall
+FontColor=#ChartAxisColor2#
+X=(#ChartPlotX#+#ChartPlotW#+6)
+Y=(#ChartPlotY#+#ChartPlotH#-6)
+StringAlign=Left
+MeasureName=MeasureChartLo2
 Text=%1
 
 [ChartFrom]
@@ -180,11 +264,22 @@ Y=(#ChartPlotY#+#ChartPlotH#+6)
 StringAlign=Right
 Text=现在
 
-[ChartFoot]
+[ChartFootTemp]
 Meter=String
 MeterStyle=StyleSmall
+FontColor=#ChartAxisColor#
 X=18
-Y=(#ChartPlotY#+#ChartPlotH#+24)
+Y=(#ChartPlotY#+#ChartPlotH#+22)
 MeasureName=MeasureChartMin
 MeasureName2=MeasureChartMax
-Text=低 %1　高 %2 #ChartUnit#
+Text=温度 低 %1　高 %2 #ChartUnit#
+
+[ChartFootHum]
+Meter=String
+MeterStyle=StyleSmall
+FontColor=#ChartAxisColor2#
+X=18
+Y=(#ChartPlotY#+#ChartPlotH#+37)
+MeasureName=MeasureChartHumMin
+MeasureName2=MeasureChartHumMax
+Text=湿度 低 %1　高 %2 #ChartUnit2#

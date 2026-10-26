@@ -60,6 +60,7 @@ dist/DormProbe.exe chart "" 24                     # 单独渲染曲线，验证
 | 汇总数字由采集线程调 `Stats::refresh` 算，`Update` 只读缓存 | 在 `GetString`/`Update` 里临时查库（会被每帧调用几十次） |
 | 曲线在 `Chart.cpp` 自己的线程里画（GDI+ 动态加载），`Update` 只返回路径 | 在 `Update`/`GetString` 里画图或调 `GdiplusStartup` |
 | 曲线 PNG 文件名带 rev（`today_3.png`），路径一变 Rainmeter 才会重新载图 | 原地覆盖同名 PNG（Rainmeter 会继续显示缓存的那张） |
+| 双序列曲线（`Series=Both`）温度走左轴、湿度走右轴，刻度分别用 `ChartHi/Mid/Lo` 与 `ChartHi2/Mid2/Lo2` | 让湿度蹭温度那根轴（两套量纲，读数会完全对不上） |
 | `Store` 只认目录，不读全局配置 | 在 `Store` 里调 `Config`（循环依赖） |
 
 ## 故障排查顺序
@@ -70,8 +71,9 @@ dist/DormProbe.exe chart "" 24                     # 单独渲染曲线，验证
 4. **数据不入库** → `DormProbe.exe db` 看行数；再看日志里是否有 `storage: sqlite unavailable`。
 5. **日志本身缺失** → 日志路径 = 皮肤 `DataPath`；为空才退 `%TEMP%`。
 6. **看不到界面改了什么** → 前台是全屏游戏时截图只能拍到游戏；用
-   `python tools/grab_skin.py out.bmp 225 113` 直接取皮肤窗口的离屏画面
-   （窗口尺寸 = 皮肤尺寸 + 1，主面板 224×112 → 225×113）。
+   `python tools/grab_skin.py out.png 249 175 ChartDay` 直接取皮肤窗口的离屏画面，
+   第四个参数按标题关键字挑窗口（窗口尺寸 = 皮肤尺寸 + 1：主面板 224×112 → 225×113，
+   曲线卡 248×174 → 249×175）。
 7. **皮肤没出来** → `!ActivateConfig <config> <file>` 一次只能让一个 config 活一个皮肤；
    同一文件夹里的多个 .ini 会被互相顶掉。可选皮肤必须各自一个子文件夹。
 

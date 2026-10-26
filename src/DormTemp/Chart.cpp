@@ -137,7 +137,8 @@ std::atomic<bool> g_started{false};
 bool same_spec(const chart::Spec &a, const chart::Spec &b)
 {
     return a.window == b.window && a.hours == b.hours && a.buckets == b.buckets &&
-           a.width == b.width && a.height == b.height && a.series == b.series && a.rgb == b.rgb;
+           a.width == b.width && a.height == b.height && a.series == b.series &&
+           a.dual == b.dual && a.rgb == b.rgb && a.rgb2 == b.rgb2;
 }
 
 std::wstring sanitize(const wchar_t *key)
@@ -218,15 +219,34 @@ void draw_day_grid(void *gfx, void *pen, long long since, long long now, int W, 
     }
 }
 
+// 把一个序列按各自的 Y 轴折成像素点；空桶（n = 0）跳过，曲线在这里断开
+void build_points(const std::vector<store::Slot> &slots, int series,
+                  double lo, double hi, int W, int H, std::vector<GpPoint> *out)
+{
+    out->clear();
+    if (!(hi - lo > 1e-6)) return;
+
+    const int nb = static_cast<int>(slots.size());
+    out->reserve(static_cast<size_t>(nb));
+    for (int i = 0; i < nb; ++i) {
+        if (slots[static_cast<size_t>(i)].n <= 0) continue;
+        const double v = (series == chart::kHum) ? slots[static_cast<size_t>(i)].h
+                                                 : slots[static_cast<size_t>(i)].t;
+        const int x = (nb <= 1) ? (W - 1) / 2
+                                : static_cast<int>(std::lround(static_cast<double>(i) * (W - 1) / (nb - 1)));
+        const int y = static_cast<int>(std::lround((H - 1) - (v - lo) / (hi - lo) * (H - 1)));
+        out->push_back({x, std::max(0, std::min(H - 1, y))});
+    }
+}
+
 bool draw_png(const chart::Spec &spec, const std::vector<store::Slot> &slots,
-              double lo, double hi, const std::wstring &path)
+              double lo, double hi, double lo2, double hi2, const std::wstring &path)
 {
     if (!g_gdiOk || slots.empty()) return false;
     if (hi - lo < 1e-6) return false;
 
     const int W = std::max(40, std::min(1200, spec.width));
     const int H = std::max(30, std::min(600, spec.height));
-    const int nb = static_cast<int>(slots.size());
 
     const long long now = static_cast<long long>(time(nullptr));
     const long long since = since_of(spec, now);
@@ -243,7 +263,9 @@ bool draw_png(const chart::Spec &spec, const std::vector<store::Slot> &slots,
     g_gdi.set_pixel_offset(gfx, 4);   // PixelOffsetModeHalf
     g_gdi.clear(gfx, 0x00000000);     // 全透明
 
-    const unsigned accent = spec.rgb & 0xFFFFFF;
+    const unsigned accent  = spec.rgb  & 0xFFFFFF;
+    const unsigned accent2 = spec.rgb2 & 0xFFFFFF;
+    const bool dual = spec.dual && (hi2 - lo2 > 1e-6);
 
     // 横向刻度线：0 / 25 / 50 / 75 / 100%
     void *penGrid = nullptr;
@@ -257,26 +279,21 @@ bool draw_png(const chart::Spec &spec, const std::vector<store::Slot> &slots,
     }
 
     std::vector<GpPoint> pts;
-    pts.reserve(static_cast<size_t>(nb));
-    for (int i = 0; i < nb; ++i) {
-        if (slots[static_cast<size_t>(i)].n <= 0) continue;
-        const double v = (spec.series == chart::kHum) ? slots[static_cast<size_t>(i)].h
-                                                      : slots[static_cast<size_t>(i)].t;
-        const int x = (nb <= 1) ? (W - 1) / 2
-                                : static_cast<int>(std::lround(static_cast<double>(i) * (W - 1) / (nb - 1)));
-        const int y = static_cast<int>(std::lround((H - 1) - (v - lo) / (hi - lo) * (H - 1)));
-        pts.push_back({x, std::max(0, std::min(H - 1, y))});
-    }
+    build_points(slots, spec.series, lo, hi, W, H, &pts);
 
-    if (pts.empty()) {
+    std::vector<GpPoint> pts2;
+    if (dual) build_points(slots, chart::kHum, lo2, hi2, W, H, &pts2);
+
+    if (pts.empty() && pts2.empty()) {
         if (penGrid) g_gdi.delete_pen(penGrid);
         g_gdi.delete_graphics(gfx);
         g_gdi.dispose_image(bmp);
         return false;
     }
 
-    // 曲线下的渐变没法做（要 PathGradient），用低透明纯色填充，够用且便宜
-    if (pts.size() >= 2) {
+    // 曲线下的渐变没法做（要 PathGradient），用低透明纯色填充，够用且便宜。
+    // 双序列不填：两条线的图里面积会把另一条闷住，数据还没铺满窗口时边缘也显得生硬
+    if (!dual && pts.size() >= 2) {
         std::vector<GpPoint> poly;
         poly.reserve(pts.size() + 2);
         poly.push_back({pts.front().X, H - 1});
@@ -290,20 +307,28 @@ bool draw_png(const chart::Spec &spec, const std::vector<store::Slot> &slots,
         }
     }
 
-    void *penLine = nullptr;
-    if (g_gdi.create_pen(0xFF000000 | accent, 2.0f, 2, &penLine) == 0 && penLine) {
-        if (pts.size() >= 2)
-            g_gdi.draw_lines(gfx, penLine, pts.data(), static_cast<int>(pts.size()));
-        g_gdi.delete_pen(penLine);
-    }
+    // 湿度先画（当参考线，细一点），温度压在上层
+    auto stroke = [&](const std::vector<GpPoint> &p, unsigned color, float w) {
+        if (p.size() < 2) return;
+        void *pen = nullptr;
+        if (g_gdi.create_pen(0xFF000000 | color, w, 2, &pen) == 0 && pen) {
+            g_gdi.draw_lines(gfx, pen, p.data(), static_cast<int>(p.size()));
+            g_gdi.delete_pen(pen);
+        }
+    };
+    stroke(pts2, accent2, 1.5f);
+    stroke(pts, accent, 2.0f);
 
-    // 末端一个小实心点，示意「最新一刻」
-    void *brushDot = nullptr;
-    if (g_gdi.create_fill(0xFFFFFFFF, &brushDot) == 0 && brushDot) {
-        const GpPoint &last = pts.back();
-        g_gdi.fill_ellipse(gfx, brushDot, last.X - 2, last.Y - 2, 5, 5);
-        g_gdi.delete_brush(brushDot);
-    }
+    // 末端一个小实心点，示意「最新一刻」；双序列时用本线颜色，免得两条线分不清
+    auto dot = [&](const GpPoint &p, unsigned color) {
+        void *brushDot = nullptr;
+        if (g_gdi.create_fill(0xFF000000 | color, &brushDot) == 0 && brushDot) {
+            g_gdi.fill_ellipse(gfx, brushDot, p.X - 2, p.Y - 2, 5, 5);
+            g_gdi.delete_brush(brushDot);
+        }
+    };
+    if (!pts2.empty()) dot(pts2.back(), accent2);
+    if (!pts.empty())  dot(pts.back(), dual ? accent : 0xFFFFFFu);
 
     if (penGrid) g_gdi.delete_pen(penGrid);
     g_gdi.delete_graphics(gfx);
@@ -327,30 +352,38 @@ bool render_one(const chart::Spec &spec, const std::wstring &dir, const std::wst
     if (!store::series(since, now + 1, nb, slots.data())) return false;
 
     int n = 0;
-    double mn = 1e18, mx = -1e18;
+    double tmn = 1e18, tmx = -1e18;
     double hmn = 1e18, hmx = -1e18;
     int hmnIdx = -1, hmxIdx = -1;
     for (int i = 0; i < nb; ++i) {
         const auto &s = slots[static_cast<size_t>(i)];
         if (s.n <= 0) continue;
         n += s.n;
-        const double v = (spec.series == chart::kHum) ? s.h : s.t;
-        mn = std::min(mn, v);
-        mx = std::max(mx, v);
+        tmn = std::min(tmn, s.t);
+        tmx = std::max(tmx, s.t);
         if (s.h < hmn) { hmn = s.h; hmnIdx = i; }
         if (s.h > hmx) { hmx = s.h; hmxIdx = i; }
     }
     if (n <= 0) return false;
 
+    // 双序列各算各的轴：温度走左边（°C），湿度走右边（%）
     double lo = 0, mid = 0, hi = 0;
-    chart::axis_bounds(mn, mx, spec.series, &lo, &hi, &mid);
+    double lo2 = 0, mid2 = 0, hi2 = 0;
+    if (spec.dual) {
+        chart::axis_bounds(tmn, tmx, chart::kTemp, &lo, &hi, &mid);
+        chart::axis_bounds(hmn, hmx, chart::kHum, &lo2, &hi2, &mid2);
+    } else if (spec.series == chart::kHum) {
+        chart::axis_bounds(hmn, hmx, chart::kHum, &lo, &hi, &mid);
+    } else {
+        chart::axis_bounds(tmn, tmx, chart::kTemp, &lo, &hi, &mid);
+    }
 
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
 
     wchar_t name[96];
     swprintf(name, 96, L"%s\\%s_%d.png", dir.c_str(), stem.c_str(), rev % 1000);
-    if (!draw_png(spec, slots, lo, hi, name)) return false;
+    if (!draw_png(spec, slots, lo, hi, lo2, hi2, name)) return false;
 
     chart::View v;
     v.valid = true;
@@ -358,6 +391,9 @@ bool render_one(const chart::Spec &spec, const std::wstring &dir, const std::wst
     v.lo = lo;
     v.mid = mid;
     v.hi = hi;
+    v.lo2 = lo2;
+    v.mid2 = mid2;
+    v.hi2 = hi2;
     v.n = n;
     v.hMin = hmn;
     v.hMax = hmx;
@@ -562,6 +598,7 @@ std::wstring series_text(int id)
     std::lock_guard<std::mutex> lk(g_mtx);
     auto it = g_entries.find(id);
     if (it == g_entries.end()) return std::wstring();
+    if (it->second.spec.dual) return L"温度 / 湿度";
     return it->second.spec.series == kHum ? L"湿度" : L"温度";
 }
 

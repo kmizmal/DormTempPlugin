@@ -45,6 +45,7 @@ enum class Field {
 enum class ChartField {
     None = 0,
     Path, Hi, Mid, Lo,
+    Hi2, Mid2, Lo2,          // 右侧第二根轴（湿度）的刻度
     Min, Max, MinAt, MaxAt,
     Span, Series,
 };
@@ -70,6 +71,9 @@ ChartField chart_field_of(const wchar_t *t)
     if (_wcsicmp(t, L"ChartHi") == 0) return ChartField::Hi;
     if (_wcsicmp(t, L"ChartMid") == 0) return ChartField::Mid;
     if (_wcsicmp(t, L"ChartLo") == 0) return ChartField::Lo;
+    if (_wcsicmp(t, L"ChartHi2") == 0) return ChartField::Hi2;
+    if (_wcsicmp(t, L"ChartMid2") == 0) return ChartField::Mid2;
+    if (_wcsicmp(t, L"ChartLo2") == 0) return ChartField::Lo2;
     if (_wcsicmp(t, L"ChartMin") == 0) return ChartField::Min;
     if (_wcsicmp(t, L"ChartMax") == 0) return ChartField::Max;
     if (_wcsicmp(t, L"ChartMinAt") == 0) return ChartField::MinAt;
@@ -89,6 +93,15 @@ int clamp_int(const wchar_t *text, int lo, int hi, int def)
 
 unsigned clamp_byte(int v) { return static_cast<unsigned>(v < 0 ? 0 : (v > 255 ? 255 : v)); }
 
+unsigned parse_rgb(const wchar_t *text, int dr, int dg, int db)
+{
+    int r = dr, g = dg, b = db;
+    if (text && *text && swscanf(text, L"%d,%d,%d", &r, &g, &b) != 3) {
+        r = dr; g = dg; b = db;
+    }
+    return (clamp_byte(r) << 16) | (clamp_byte(g) << 8) | clamp_byte(b);
+}
+
 chart::Spec read_spec(void *rm)
 {
     chart::Spec s;
@@ -102,14 +115,15 @@ chart::Spec read_spec(void *rm)
     s.width   = clamp_int(rmapi::read(rm, L"Width", L"180"), 40, 1200, 180);
     s.height  = clamp_int(rmapi::read(rm, L"Height", L"92"), 30, 600, 92);
 
+    // Series=Temp | Hum | Both。Both：温度走左轴、湿度走右轴，画在同一张图上
     const LPCWSTR ser = rmapi::read(rm, L"Series", L"Temp");
-    s.series = (ser && (_wcsicmp(ser, L"Hum") == 0 || _wcsicmp(ser, L"Humidity") == 0))
+    const bool both = ser && (_wcsicmp(ser, L"Both") == 0 || _wcsicmp(ser, L"All") == 0);
+    s.dual = both;
+    s.series = (!both && ser && (_wcsicmp(ser, L"Hum") == 0 || _wcsicmp(ser, L"Humidity") == 0))
                    ? chart::kHum : chart::kTemp;
 
-    int r = 120, g = 196, b = 255;
-    const LPCWSTR col = rmapi::read(rm, L"Color", L"120,196,255");
-    if (col && *col) swscanf(col, L"%d,%d,%d", &r, &g, &b);
-    s.rgb = (clamp_byte(r) << 16) | (clamp_byte(g) << 8) | clamp_byte(b);
+    s.rgb  = parse_rgb(rmapi::read(rm, L"Color",  L"120,196,255"), 120, 196, 255);
+    s.rgb2 = parse_rgb(rmapi::read(rm, L"Color2", L"127,224,176"), 127, 224, 176);
     return s;
 }
 
@@ -229,6 +243,9 @@ __declspec(dllexport) double __cdecl Update(void *data)
         case ChartField::Hi:   return v.hi;
         case ChartField::Mid:  return v.mid;
         case ChartField::Lo:   return v.lo;
+        case ChartField::Hi2:  return v.hi2;
+        case ChartField::Mid2: return v.mid2;
+        case ChartField::Lo2:  return v.lo2;
         case ChartField::Min:  return hum ? v.hMin : v.tMin;
         case ChartField::Max:  return hum ? v.hMax : v.tMax;
         default:               return 0;   // 文本类没有数值意义
@@ -281,6 +298,9 @@ __declspec(dllexport) LPCWSTR __cdecl GetString(void *data)
         case ChartField::Hi:     out = v.valid ? decimal_text(v.hi, series) : L"--"; break;
         case ChartField::Mid:    out = v.valid ? decimal_text(v.mid, series) : L"--"; break;
         case ChartField::Lo:     out = v.valid ? decimal_text(v.lo, series) : L"--"; break;
+        case ChartField::Hi2:    out = v.valid ? decimal_text(v.hi2, chart::kHum) : L"--"; break;
+        case ChartField::Mid2:   out = v.valid ? decimal_text(v.mid2, chart::kHum) : L"--"; break;
+        case ChartField::Lo2:    out = v.valid ? decimal_text(v.lo2, chart::kHum) : L"--"; break;
         case ChartField::Min:    out = v.valid ? decimal_text(series == chart::kHum ? v.hMin : v.tMin, series) : L"--"; break;
         case ChartField::Max:    out = v.valid ? decimal_text(series == chart::kHum ? v.hMax : v.tMax, series) : L"--"; break;
         case ChartField::MinAt:  out = stats::clock_hhmm(series == chart::kHum ? v.hMinTs : v.tMinTs); break;

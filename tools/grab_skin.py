@@ -1,7 +1,8 @@
 """抓取 Rainmeter 皮肤窗口的离屏画面（PrintWindow），不受前台游戏遮挡影响。
 
-用法：python grab_skin.py <输出png> <宽> <高>
-按尺寸匹配窗口，命中第一个就截图；找不到时打印候选清单便于排查。
+用法：python grab_skin.py <输出png> <宽> <高> [标题关键字]
+按尺寸匹配窗口，命中第一个就截图；给了标题关键字则再按标题过滤（例如 ChartDay）。
+找不到时打印候选清单便于排查。
 """
 import ctypes
 import ctypes.wintypes as wt
@@ -35,7 +36,9 @@ def windows():
         if w > 60 and h > 60:
             c = ctypes.create_unicode_buffer(256)
             user32.GetClassNameW(hwnd, c, 256)
-            out.append((hwnd, w, h, r.left, r.top, c.value))
+            t = ctypes.create_unicode_buffer(512)
+            user32.GetWindowTextW(hwnd, t, 512)
+            out.append((hwnd, w, h, r.left, r.top, c.value, t.value))
         return True
 
     proc = ctypes.WINFUNCTYPE(wt.BOOL, wt.HWND, wt.LPARAM)(cb)
@@ -78,14 +81,17 @@ def main():
     out = sys.argv[1]
     want_w = int(sys.argv[2])
     want_h = int(sys.argv[3])
+    needle = sys.argv[4].lower() if len(sys.argv) > 4 else None
 
     cands = windows()
-    exact = [c for c in cands if abs(c[1] - want_w) <= 2 and abs(c[2] - want_h) <= 2]
+    exact = [c for c in cands
+             if abs(c[1] - want_w) <= 2 and abs(c[2] - want_h) <= 2
+             and (not needle or needle in c[6].lower())]
     if not exact:
         print("没找到尺寸匹配的窗口，候选：")
         for c in cands:
             if 150 <= c[1] <= 400 and 60 <= c[2] <= 500:
-                print("  ", c[1], c[2], c[3], c[4], c[5])
+                print("  ", c[1], c[2], c[3], c[4], c[5], c[6][-50:])
         return 1
 
     hwnd, w, h, *_ = exact[0]

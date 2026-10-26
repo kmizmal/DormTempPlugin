@@ -5,7 +5,7 @@
 //    DormProbe.exe scan [秒=8]           列出周边广播：MAC / RSSI / 名称 / 是否命中
 //    DormProbe.exe read [MAC] [秒=20]    连接并打印通知（不给 MAC 就先扫描）
 //    DormProbe.exe db [数据目录]          看 SQLite 里已有的记录
-//    DormProbe.exe chart [数据目录] [小时] [temp|hum]
+//    DormProbe.exe chart [数据目录] [小时] [temp|hum|both]
 //                                         把历史采样渲染成一张 PNG（验证曲线外观）
 //
 //  刻意不写正式数据目录：探测期间落在 %TEMP%\DormProbe，不污染皮肤在用的库。
@@ -191,7 +191,7 @@ int cmd_db(const std::wstring &dir)
     return 0;
 }
 
-int cmd_chart(const std::wstring &dir, int hours, int series)
+int cmd_chart(const std::wstring &dir, int hours, int series, bool dual)
 {
     if (!store::init(dir)) {
         sayf(L"打不开数据库：%s", dir.c_str());
@@ -205,6 +205,7 @@ int cmd_chart(const std::wstring &dir, int hours, int series)
     spec.width   = 180;
     spec.height  = 92;
     spec.series  = series;
+    spec.dual    = dual;
 
     chart::start();
     const int id = chart::open(L"probe", spec);
@@ -229,6 +230,7 @@ int cmd_chart(const std::wstring &dir, int hours, int series)
 
     sayf(L"PNG：%s", v.path.c_str());
     sayf(L"样本 %d 条，Y 轴 %.1f ~ %.1f（中 %.1f）", v.n, v.lo, v.hi, v.mid);
+    if (dual) sayf(L"右轴 %.0f ~ %.0f（中 %.0f）", v.lo2, v.hi2, v.mid2);
     sayf(L"温度 %.1f ~ %.1f ℃　湿度 %.0f ~ %.0f %%RH", v.tMin, v.tMax, v.hMin, v.hMax);
     chart::stop();
     Sleep(300);
@@ -253,8 +255,9 @@ int wmain(int argc, wchar_t **argv)
         const std::wstring dir =
             argc > 2 ? argv[2] : config::expand_env(L"%LOCALAPPDATA%\\DormTempPlugin");
         const int hours = argc > 3 ? _wtoi(argv[3]) : 24;
-        const int series = (argc > 4 && _wcsicmp(argv[4], L"hum") == 0) ? chart::kHum : chart::kTemp;
-        return cmd_chart(dir, hours, series);
+        const bool hum = argc > 4 && _wcsicmp(argv[4], L"hum") == 0;
+        const bool both = argc > 4 && (_wcsicmp(argv[4], L"both") == 0 || _wcsicmp(argv[4], L"all") == 0);
+        return cmd_chart(dir, hours, hum ? chart::kHum : chart::kTemp, both);
     }
 
     config::set_log_dir(probe_dir());

@@ -23,14 +23,17 @@ struct Spec {
     int      buckets = 96;
     int      width   = 180;
     int      height  = 92;
-    int      series  = kTemp;
+    int      series  = kTemp;      // 左轴序列（dual 时固定为温度）
+    bool     dual    = false;      // 同图再画一条湿度线，走右侧第二根 Y 轴
     unsigned rgb     = 0x78C4FF;   // 0xRRGGBB
+    unsigned rgb2    = 0x7FE0B0;   // dual 时的湿度线颜色
 };
 
 struct View {
     bool         valid = false;
     std::wstring path;            // PNG 绝对路径（还没渲染出来时为空）
-    double lo = 0, mid = 0, hi = 0;   // Y 轴上下界（已取整，给坐标轴标签用）
+    double lo = 0, mid = 0, hi = 0;       // 左轴上下界（已取整，给坐标轴标签用）
+    double lo2 = 0, mid2 = 0, hi2 = 0;    // 右轴（只有 dual 渲染时才有值）
     double tMin = 0, tMax = 0, hMin = 0, hMax = 0;
     long long tMinTs = 0, tMaxTs = 0;
     long long hMinTs = 0, hMaxTs = 0;   // 湿度极值时刻按桶心估算，不额外查库
