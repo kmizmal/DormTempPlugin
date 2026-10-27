@@ -3,6 +3,11 @@ name: build
 on:
   push:
     branches: [main]
+    # 只改文档（不进包的那几个）不用重跑 4 分钟编译
+    paths-ignore:
+      - AGENTS.md
+      - docs/**
+      - .gitignore
   pull_request:
   workflow_dispatch:
 
@@ -27,7 +32,7 @@ jobs:
       contents: read
     steps:
       - name: 检出
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 版本号只在皮肤里写一份，包名和产物名都跟着它走
       - name: 读取皮肤版本号
@@ -41,14 +46,14 @@ jobs:
           Write-Host "皮肤版本 $version"
 
       - name: 准备 Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       # 79 MB 的 zig 每次重下太慢，按版本号缓存
       - name: 缓存 zig
         id: zig-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: C:\zig
           key: zig-${{ env.ZIG_VERSION }}-windows-x86_64
@@ -92,7 +97,7 @@ jobs:
 
       - name: 缓存 WinRT 投影头
         id: winrt-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: winrt_gen
           key: winrt-gen-${{ steps.sdk.outputs.version }}-v2
@@ -173,7 +178,7 @@ jobs:
           $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       - name: 上传产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: DormTempMonitor-${{ steps.meta.outputs.version }}
           path: |
