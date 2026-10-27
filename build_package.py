@@ -22,8 +22,16 @@ from __future__ import annotations
 import argparse
 import shutil
 import struct
+import sys
 import zipfile
 from pathlib import Path
+
+# 同 build_plugin.py：CI 的 cp1252 stdout 打不出中文，先切成 UTF-8
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 CONFIG = "DormTempMonitor"
 PLUGIN_NAME = "DormTemp"

@@ -27,6 +27,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+# windows-latest 是 en-US 镜像，stdout 默认 cp1252，print 中文会抛
+# UnicodeEncodeError 把整步构建打断；这里统一改成 UTF-8 并容错
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src" / "DormTemp"
 WINRT_GEN = ROOT / "winrt_gen"

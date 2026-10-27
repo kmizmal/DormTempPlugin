@@ -14,6 +14,9 @@ concurrency:
 env:
   ZIG_VERSION: 0.13.0
   ZIG: C:\zig\zig.exe
+  # 构建脚本里 print 的是中文，en-US 镜像的 cp1252 控制台会直接抛异常
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
 
 jobs:
   build:
