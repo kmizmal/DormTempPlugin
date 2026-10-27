@@ -94,9 +94,9 @@ jobs:
           path: winrt_gen
           key: winrt-gen-${{ steps.sdk.outputs.version }}-v2
 
-      # Server 版镜像不保证有 %WINDIR%\System32\WinMetadata（2026-10-27 那次就是
-      # 这里报 "Path ... is not a file or directory"），所以按三个来源依次试：
-      # WinMetadata → SDK References 里各契约的 winmd → UnionMetadata\Windows.winmd
+      # 2026-10-27 两次失败都在这：先以为镜像没有 WinMetadata，实测它在那儿（20 个 winmd），
+      # 真正的原因是 cppwinrt 不认 "*.winmd" 通配符——本地能过只是 shell 替我们展开了。
+      # 现在按目录喂，并在没产出时退回逐个文件；来源按三处依次找，都缺才报错。
       - name: 生成 WinRT 投影头
         if: steps.winrt-cache.outputs.cache-hit != 'true'
         shell: pwsh
@@ -129,11 +129,20 @@ jobs:
           }
 
           Write-Host "元数据来源 $source（$($winmds.Count) 个 winmd）"
-          # cppwinrt 只认一个 -in，把散落的 winmd 汇到一个临时目录再吃通配符
+          # cppwinrt 不展开 *.winmd 通配符（本地能跑是因为命令行自己展开过），
+          # 只吃「目录」或「具体文件」；把散落的 winmd 汇到一个目录再喂进去
           $stage = Join-Path $env:RUNNER_TEMP 'winmd'
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
           foreach ($f in $winmds) { Copy-Item $f -Destination $stage -Force }
-          & $cppwinrt -in "$stage\*.winmd" -out winrt_gen
+
+          & $cppwinrt -in $stage -out winrt_gen
+          if (-not (Test-Path 'winrt_gen\winrt\base.h')) {
+            # 目录形式不认时再退回逐个文件
+            Write-Host '目录形式没产出 base.h，改用逐个 -in 重试'
+            $argv = @()
+            foreach ($f in $winmds) { $argv += @('-in', $f) }
+            & $cppwinrt @argv -out winrt_gen
+          }
           if (-not (Test-Path 'winrt_gen\winrt\base.h')) { throw 'cppwinrt 没生成 winrt/base.h' }
           Write-Host "生成完毕：$((Get-ChildItem winrt_gen -Recurse -File | Measure-Object).Count) 个文件"
 
