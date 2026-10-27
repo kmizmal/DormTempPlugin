@@ -92,14 +92,50 @@ jobs:
         uses: actions/cache@v4
         with:
           path: winrt_gen
-          key: winrt-gen-${{ steps.sdk.outputs.version }}-v1
+          key: winrt-gen-${{ steps.sdk.outputs.version }}-v2
 
+      # Server 版镜像不保证有 %WINDIR%\System32\WinMetadata（2026-10-27 那次就是
+      # 这里报 "Path ... is not a file or directory"），所以按三个来源依次试：
+      # WinMetadata → SDK References 里各契约的 winmd → UnionMetadata\Windows.winmd
       - name: 生成 WinRT 投影头
         if: steps.winrt-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          & '${{ steps.sdk.outputs.exe }}' -in "$env:WINDIR\System32\WinMetadata\*.winmd" -out winrt_gen
+          $cppwinrt = '${{ steps.sdk.outputs.exe }}'
+          $sdkVer   = '${{ steps.sdk.outputs.version }}'
+          $kits     = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10'
+          $winMeta  = Join-Path $env:WINDIR 'System32\WinMetadata'
+          $refs     = Join-Path $kits "References\$sdkVer"
+          $union    = Join-Path $kits "UnionMetadata\$sdkVer\Windows.winmd"
+
+          $winmds = @()
+          $source = $null
+
+          if (Test-Path $winMeta) {
+            $winmds = @(Get-ChildItem "$winMeta\*.winmd" | ForEach-Object FullName)
+            $source = $winMeta
+          }
+          if (-not $winmds -and (Test-Path $refs)) {
+            $winmds = @(Get-ChildItem $refs -Recurse -Filter *.winmd |
+                        Sort-Object FullName -Unique | ForEach-Object FullName)
+            $source = $refs
+          }
+          if (-not $winmds -and (Test-Path $union)) {
+            $winmds = @($union)
+            $source = $union
+          }
+          if (-not $winmds) {
+            throw "找不到 WinRT 元数据：$winMeta、$refs、$union 都不存在"
+          }
+
+          Write-Host "元数据来源 $source（$($winmds.Count) 个 winmd）"
+          # cppwinrt 只认一个 -in，把散落的 winmd 汇到一个临时目录再吃通配符
+          $stage = Join-Path $env:RUNNER_TEMP 'winmd'
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          foreach ($f in $winmds) { Copy-Item $f -Destination $stage -Force }
+          & $cppwinrt -in "$stage\*.winmd" -out winrt_gen
           if (-not (Test-Path 'winrt_gen\winrt\base.h')) { throw 'cppwinrt 没生成 winrt/base.h' }
+          Write-Host "生成完毕：$((Get-ChildItem winrt_gen -Recurse -File | Measure-Object).Count) 个文件"
 
       - name: 编译插件 + 跑测试
         run: python build_plugin.py --test --probe
