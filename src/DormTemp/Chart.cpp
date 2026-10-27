@@ -355,11 +355,14 @@ bool render_one(const chart::Spec &spec, const std::wstring &dir, const std::wst
     int n = 0;
     double tmn = 1e18, tmx = -1e18;
     double hmn = 1e18, hmx = -1e18;
+    double tsum = 0, hsum = 0;      // 按桶内样本数加权：桶是均值，直接对桶求平均会被样本少的桶带偏
     int hmnIdx = -1, hmxIdx = -1;
     for (int i = 0; i < nb; ++i) {
         const auto &s = slots[static_cast<size_t>(i)];
         if (s.n <= 0) continue;
         n += s.n;
+        tsum += s.t * s.n;
+        hsum += s.h * s.n;
         tmn = std::min(tmn, s.t);
         tmx = std::max(tmx, s.t);
         if (s.h < hmn) { hmn = s.h; hmnIdx = i; }
@@ -398,6 +401,8 @@ bool render_one(const chart::Spec &spec, const std::wstring &dir, const std::wst
     v.n = n;
     v.hMin = hmn;
     v.hMax = hmx;
+    v.tAvg = tsum / n;          // 先用桶加权平值兜底
+    v.hAvg = hsum / n;
 
     // 湿度极值时刻按桶心估算（±半个桶），不为此再扫一遍库
     const long long width = (now + 1 - since + nb - 1) / nb;
@@ -409,6 +414,7 @@ bool render_one(const chart::Spec &spec, const std::wstring &dir, const std::wst
         v.tMin = agg.tMin; v.tMax = agg.tMax;
         v.hMin = agg.hMin; v.hMax = agg.hMax;
         v.tMinTs = agg.tMinTs; v.tMaxTs = agg.tMaxTs;
+        v.tAvg = agg.tAvg; v.hAvg = agg.hAvg;   // 全量扫描得到的均值更准，覆盖桶加权的结果
     }
 
     *out = v;

@@ -35,6 +35,7 @@ struct View {
     double lo = 0, mid = 0, hi = 0;       // 左轴上下界（已取整，给坐标轴标签用）
     double lo2 = 0, mid2 = 0, hi2 = 0;    // 右轴（只有 dual 渲染时才有值）
     double tMin = 0, tMax = 0, hMin = 0, hMax = 0;
+    double tAvg = 0, hAvg = 0;            // 窗口内均值（按样本加权，不是「桶均值的均值」）
     long long tMinTs = 0, tMaxTs = 0;
     long long hMinTs = 0, hMaxTs = 0;   // 湿度极值时刻按桶心估算，不额外查库
     int      n = 0;               // 窗口内样本条数

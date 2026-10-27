@@ -41,6 +41,8 @@ DormTempMonitor/
   皮肤只负责贴图。**温度和湿度画在同一张图上**：温度走左轴（蓝），湿度走右轴（绿），
   透明底 + 网格 + 折线 + 末端点；两轴各三档刻度、左侧「起始时间」右侧「现在」，
   底部两行分别给温度和湿度在区间内的最低 / 最高。
+  **鼠标停在卡片上**会浮出一层小面板，给出本区间的温湿度均值（24 小时卡就是 24h 均值）；
+  均值按窗口内每条采样加权，不是「每桶均值的再平均」，所以样本稀的时段不会把结果带偏。
 - 想在卡片里改区间：`Cards\<名字>\<名字>.ini` 的 `[Variables]` 里改 `CardWindow`（只有
   Today / 24h / 7d）；曲线卡还能把 `ChartWindow` 留空、写 `ChartHours=48` 要任意小时数，
   `ChartSeries=Both`（默认）双轴同图，写 `Temp` 或 `Hum` 就只画一条。
@@ -60,6 +62,7 @@ measure 的 `Type` 一览（`Window` 只对汇总 / 曲线类生效，取值 `To
 | 曲线 | `ChartHi` `ChartMid` `ChartLo` | 左轴（温度）三档刻度值 |
 | 曲线 | `ChartHi2` `ChartMid2` `ChartLo2` | 右轴（湿度）三档刻度值，`Series=Both` 时才有值 |
 | 曲线 | `ChartMin` `ChartMax` `ChartMinAt` `ChartMaxAt` | 区间内极值与出现时刻（`Series=Hum` 取湿度的） |
+| 曲线 | `ChartAvg` | 区间内均值，`Series=Temp`（默认）/ `Hum` 决定取哪一项，给悬停浮层用 |
 | 曲线 | `ChartSpan` `ChartSeries` | 「24 小时前」这类时间轴文案、当前序列名（双轴时为「温度 / 湿度」） |
 
 曲线类共用 `Chart=<key>` 指定同一份渲染结果（同一个 key 只画一次），

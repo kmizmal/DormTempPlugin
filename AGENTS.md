@@ -62,6 +62,10 @@ dist/DormProbe.exe chart "" 24                     # 单独渲染曲线，验证
 | 曲线 PNG 每次写成新 rev 文件名，Image meter 上加 `DynamicVariables=1` | 只靠同名覆盖（重写那一下可能被宿主读到半个文件） |
 | 双序列曲线（`Series=Both`）温度走左轴、湿度走右轴，刻度分别用 `ChartHi/Mid/Lo` 与 `ChartHi2/Mid2/Lo2` | 让湿度蹭温度那根轴（两套量纲，读数会完全对不上） |
 | `Store` 只认目录，不读全局配置 | 在 `Store` 里调 `Config`（循环依赖） |
+| 悬停浮层的「命中区」用 alpha=1 的 Shape 铺满卡片，且**写在最后一个** | 把命中区压在下面：鼠标落到曲线/文字上就触发 `MouseLeave`，浮层闪个不停 |
+
+悬停均值（2026-10-27）：`ChartAvg` 取的是 `store::aggregate()` 的 `avg(temp\|hum)`，
+按窗口内每条采样算；分桶均值再平均会被样本少的桶带偏，只在 `aggregate` 失败时兜底用。
 
 Image meter 的缓存规则（2026-10-26 用一个三块并排的测试皮肤实测，推翻过这里原先的说法）：
 `ImageName` 写字面量路径时按路径缓存，改写磁盘文件**不**刷新；加了 `DynamicVariables=1`

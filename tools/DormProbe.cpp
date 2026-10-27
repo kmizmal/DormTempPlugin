@@ -232,6 +232,7 @@ int cmd_chart(const std::wstring &dir, int hours, int series, bool dual)
     sayf(L"样本 %d 条，Y 轴 %.1f ~ %.1f（中 %.1f）", v.n, v.lo, v.hi, v.mid);
     if (dual) sayf(L"右轴 %.0f ~ %.0f（中 %.0f）", v.lo2, v.hi2, v.mid2);
     sayf(L"温度 %.1f ~ %.1f ℃　湿度 %.0f ~ %.0f %%RH", v.tMin, v.tMax, v.hMin, v.hMax);
+    sayf(L"均值 温度 %.2f ℃　湿度 %.1f %%RH（%d 条样本）", v.tAvg, v.hAvg, v.n);
     chart::stop();
     Sleep(300);
     return 0;

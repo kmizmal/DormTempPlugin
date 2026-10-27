@@ -148,6 +148,26 @@ Chart=#ChartKey#
 UpdateDivider=10
 DynamicVariables=1
 
+; ============ 区间均值（悬停浮层用） ============
+; 均值按窗口内每条样本加权，不是「桶均值的均值」，样本少的桶不会把结果带偏
+[MeasureChartAvgTemp]
+Measure=Plugin
+Plugin=DormTemp
+Type=ChartAvg
+Chart=#ChartKey#
+Series=Temp
+UpdateDivider=10
+DynamicVariables=1
+
+[MeasureChartAvgHum]
+Measure=Plugin
+Plugin=DormTemp
+Type=ChartAvg
+Chart=#ChartKey#
+Series=Hum
+UpdateDivider=10
+DynamicVariables=1
+
 ; ============ 外观 ============
 [ChartBg]
 Meter=Shape
@@ -283,3 +303,45 @@ Y=(#ChartPlotY#+#ChartPlotH#+37)
 MeasureName=MeasureChartHumMin
 MeasureName2=MeasureChartHumMax
 Text=湿度 低 %1　高 %2 #ChartUnit2#
+
+; ============ 悬停浮层：本区间的温湿度均值 ============
+; 三层都挂在 ChartHover 组里，靠最底下那个 ChartHover 命中区整组显隐
+[ChartHoverBg]
+Meter=Shape
+Group=ChartHover
+Hidden=1
+Shape=Rectangle 0,0,156,26,8 | Fill Color 12,14,20,224 | StrokeWidth 1 | Stroke Color 255,255,255,26
+X=(#ChartPlotX#+(#ChartPlotW#-156)/2)
+Y=(#ChartPlotY#+(#ChartPlotH#-26)/2)
+
+[ChartHoverTemp]
+Meter=String
+Group=ChartHover
+Hidden=1
+MeterStyle=StyleSmall
+FontColor=#ChartAxisColor#
+X=(#ChartPlotX#+(#ChartPlotW#-156)/2+10)
+Y=(#ChartPlotY#+(#ChartPlotH#-26)/2+7)
+MeasureName=MeasureChartAvgTemp
+Text=均温 %1 #ChartUnit#
+
+[ChartHoverHum]
+Meter=String
+Group=ChartHover
+Hidden=1
+MeterStyle=StyleSmall
+FontColor=#ChartAxisColor2#
+X=(#ChartPlotX#+(#ChartPlotW#-156)/2+146)
+Y=(#ChartPlotY#+(#ChartPlotH#-26)/2+7)
+StringAlign=Right
+MeasureName=MeasureChartAvgHum
+Text=均湿 %1 #ChartUnit2#
+
+; 命中区：alpha 只有 1，肉眼看不见，但占位能接鼠标；放在最后 = 压在图上，
+; 否则鼠标移到曲线/文字上就会触发 Leave，浮层闪个不停
+[ChartHover]
+Meter=Shape
+Shape=Rectangle 0,0,#ChartW#,#ChartH#,12 | Fill Color 0,0,0,1 | StrokeWidth 0
+MouseOverAction=[!SetOption ChartHoverBg Hidden 0][!SetOption ChartHoverTemp Hidden 0][!SetOption ChartHoverHum Hidden 0][!UpdateMeterGroup ChartHover][!Redraw]
+MouseLeaveAction=[!SetOption ChartHoverBg Hidden 1][!SetOption ChartHoverTemp Hidden 1][!SetOption ChartHoverHum Hidden 1][!UpdateMeterGroup ChartHover][!Redraw]
+DynamicVariables=1

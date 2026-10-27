@@ -47,6 +47,7 @@ enum class ChartField {
     Path, Hi, Mid, Lo,
     Hi2, Mid2, Lo2,          // 右侧第二根轴（湿度）的刻度
     Min, Max, MinAt, MaxAt,
+    Avg,                     // 窗口均值，Series= 决定读温度还是湿度
     Span, Series,
 };
 
@@ -78,6 +79,7 @@ ChartField chart_field_of(const wchar_t *t)
     if (_wcsicmp(t, L"ChartMax") == 0) return ChartField::Max;
     if (_wcsicmp(t, L"ChartMinAt") == 0) return ChartField::MinAt;
     if (_wcsicmp(t, L"ChartMaxAt") == 0) return ChartField::MaxAt;
+    if (_wcsicmp(t, L"ChartAvg") == 0) return ChartField::Avg;
     if (_wcsicmp(t, L"ChartSpan") == 0) return ChartField::Span;
     if (_wcsicmp(t, L"ChartSeries") == 0) return ChartField::Series;
     return ChartField::None;
@@ -248,6 +250,7 @@ __declspec(dllexport) double __cdecl Update(void *data)
         case ChartField::Lo2:  return v.lo2;
         case ChartField::Min:  return hum ? v.hMin : v.tMin;
         case ChartField::Max:  return hum ? v.hMax : v.tMax;
+        case ChartField::Avg:  return hum ? v.hAvg : v.tAvg;
         default:               return 0;   // 文本类没有数值意义
         }
     }
@@ -303,6 +306,7 @@ __declspec(dllexport) LPCWSTR __cdecl GetString(void *data)
         case ChartField::Lo2:    out = v.valid ? decimal_text(v.lo2, chart::kHum) : L"--"; break;
         case ChartField::Min:    out = v.valid ? decimal_text(series == chart::kHum ? v.hMin : v.tMin, series) : L"--"; break;
         case ChartField::Max:    out = v.valid ? decimal_text(series == chart::kHum ? v.hMax : v.tMax, series) : L"--"; break;
+        case ChartField::Avg:    out = v.valid ? decimal_text(series == chart::kHum ? v.hAvg : v.tAvg, series) : L"--"; break;
         case ChartField::MinAt:  out = stats::clock_hhmm(series == chart::kHum ? v.hMinTs : v.tMinTs); break;
         case ChartField::MaxAt:  out = stats::clock_hhmm(series == chart::kHum ? v.hMaxTs : v.tMaxTs); break;
         case ChartField::Span:   out = chart::span_text(id); break;
