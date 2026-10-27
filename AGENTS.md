@@ -98,7 +98,12 @@ python build_package.py                 # 打 .rmskin + 包内自检
 
 - 运行在 `windows-latest`；zig 固定 0.13.0，下载后缓存到 `C:\zig`（`ZIG` 环境变量指向它）。
 - 投影头不入库，CI 用 SDK 自带 `cppwinrt.exe` 现生成，按 SDK 版本缓存
-  （`winrt-gen-<sdk>-v1`）。改了生成参数就升 `-v1`，否则永远命中旧缓存。
+  （当前 key `winrt-gen-<sdk>-v2`）。改了生成参数就升版本号，否则永远命中旧缓存。
+  两个坑（2026-10-27 连踩两脚）：`cppwinrt` **不展开** `*.winmd` 通配符，本地能过
+  只是 shell 替你展开了，CI 上要喂**目录**；`-in` 不给目录时再退回逐个文件重试。
+- windows-latest 是 en-US 镜像，Python 的 stdout 是 cp1252，`print` 中文会抛
+  `UnicodeEncodeError` 把构建打断。两个构建脚本开头都 reconfigure 成 UTF-8，
+  工作流另设 `PYTHONUTF8` / `PYTHONIOENCODING` 兜子进程。
 - push / PR / 手动触发，产物只进 Actions 的 artifact（保留 30 天）。**不要**让它建 Release：
   Release 页留给人工发版，自动产物进去就是污染。
 - 包名与 artifact 名都取皮肤里的 `Version=`，发版前先改那一个数字。
